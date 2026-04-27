@@ -151,7 +151,7 @@ with tab_main:
     # 사이드바의 다운로드 버튼을 위해 현재 상태를 최신화
     current_full_state = get_all_state_data(char_name, ess, rec, com)
     with st.sidebar:
-        st.download_button("📥 세공 패키지 저장", 
+        st.download_button("📥 세공 데이터 저장", 
                            data=json.dumps(current_full_state, ensure_ascii=False), 
                            file_name=f"MabiGem_{char_name}.json", 
                            use_container_width=True)
