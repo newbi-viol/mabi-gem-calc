@@ -37,7 +37,6 @@ components.html(
 options_list = ["없음", "강타댐", "방해댐", "원소댐", "보조댐", "연타댐", "생존댐", "소환댐", "이동댐",
                 "강타쿨", "방해쿨", "원소쿨", "보조쿨", "연타쿨", "생존쿨", "소환쿨", "이동쿨"]
 
-# [업데이트] 모든 상태를 하나의 딕셔너리로 묶어서 가져오는 함수
 def get_all_state_data(char_name, ess, rec, com):
     gems = []
     for i in range(22):
@@ -68,11 +67,10 @@ def parse_ocr_text_to_option(ocr_text):
     return "없음"
 
 # ---------------------------------------------------------
-# 3. 사이드바 (업데이트: 투명 글씨 및 전체 저장 로직)
+# 3. 사이드바 
 # ---------------------------------------------------------
 with st.sidebar:
     st.header("👤 기본 설정")
-    # [업데이트] value를 비우고 placeholder를 사용하여 투명 글씨 구현
     char_name = st.text_input("캐릭터명", value=st.session_state.get("char_name", ""), placeholder="캐릭터명을 입력하세요")
     st.session_state["char_name"] = char_name
     
@@ -100,7 +98,6 @@ with st.sidebar:
     st.header("💾 세공데이터 저장/불러오기")
     uploaded_file = st.file_uploader("📂 저장 파일(.json) 불러오기", type=["json"])
     
-    # [업데이트] 파일 불러올 때 이름, 타겟 옵션까지 모두 복구
     if uploaded_file:
         try:
             data = json.load(uploaded_file)
@@ -123,7 +120,6 @@ with st.sidebar:
 tab_main, tab_guide = st.tabs(["💎 보석 세공 계산기", "📖 사용 설명서"])
 
 with tab_main:
-    # [업데이트] 요청하신 제목으로 변경
     st.title("보석세공 가이드(ver 1.0)")
     if char_name:
         st.caption(f"현재 관리 중인 캐릭터: **{char_name}**")
@@ -136,7 +132,6 @@ with tab_main:
                 st.markdown(f"**보석 {i+1}**")
                 for j in range(3): st.selectbox(f"L{j}", options_list, key=f"gem_{i}_{j}", index=0, label_visibility="collapsed")
 
-    # [업데이트] 타겟 옵션 설정 (초기값 비어있게 설정 및 저장된 값 호출)
     st.subheader("🎯 타겟 옵션 설정")
     v_opts = [o for o in options_list if o != "없음"]
     col_w1, col_w2, col_w3 = st.columns(3)
@@ -148,7 +143,6 @@ with tab_main:
     with col_w3: 
         com = st.multiselect("🟢 타협(2점)", v_opts, default=st.session_state.get("com_save", []))
     
-    # 사이드바의 다운로드 버튼을 위해 현재 상태를 최신화
     current_full_state = get_all_state_data(char_name, ess, rec, com)
     with st.sidebar:
         st.download_button("📥 세공 데이터 저장", 
@@ -156,7 +150,6 @@ with tab_main:
                            file_name=f"MabiGem_{char_name}.json", 
                            use_container_width=True)
 
-    # 데이터 요약 통계
     flat_gems = []
     for i in range(22):
         for j in range(3): flat_gems.append(st.session_state.get(f"gem_{i}_{j}", "없음"))
@@ -168,7 +161,6 @@ with tab_main:
     c2.metric("권장 옵션", f"{sum(cnts.get(o,0) for o in rec)}개")
     c3.metric("타협 옵션", f"{sum(cnts.get(o,0) for o in com)}개")
 
-    # 보석 스왑 추천
     st.subheader("💡 보석 스왑 추천")
     def get_s(o): return 10 if o in ess else 5 if o in rec else 2 if o in com else 0
     
@@ -198,7 +190,6 @@ with tab_main:
     if seq_swaps: st.table(pd.DataFrame(seq_swaps))
     else: st.info("모든 옵션이 최적화되어 있거나 타겟 옵션이 설정되지 않았습니다.")
     
-    # 시뮬레이터 & 개별 가이드
     with st.expander("🔄 시뮬레이터 & 개별 추천 가이드", expanded=True):
         st.info("시뮬레이션을 통해 옵션 교체 후의 예상 데이터를 확인하세요.")
         sc = st.columns(3); sws = []
@@ -248,37 +239,33 @@ with tab_main:
 # --- [탭 2: 사용 설명서] ---
 with tab_guide:
     st.title("📖 사용 설명서")
+    
     st.header("1. 빠른 실행 순서")
     st.markdown("""
     1. 왼쪽 사이드바 **캐릭터명** 입력 
     2. 사이드바 **사진 업로드** 후 **🔍 분석 및 자동 채우기** 클릭
     3. 메인 화면 **🎯 타겟 옵션 설정**에서 본인 직업의 유효 옵션 선택
     4. **💡 보석 스왑 추천**과 **🛠️ 추천 가이드**를 보고 세팅 최적화
-    5. 세팅이 끝나면 **📥 세공 패키지 저장**을 눌러 파일로 보관
+    5. 세팅이 끝나면 **📥 세공 데이터 저장**을 눌러 파일로 보관
     """)
     
-
     st.header("2. 스크린샷 촬영 가이드")
     st.write("아이템 가방에서 장비를 클릭했을 때 나오는 상세 옵션 창을 캡처해 주세요.")
+    
     col_g1, col_g2 = st.columns(2)
     with col_g1:
-        st.info("✅ **권장 화면**\n- 스킬 이름(#강타, #생존 등)이 명확히 보여야 함\n- '대미지 강화' 혹은 '대기 시간 감소' 텍스트 포함")
+        st.info("✅ **올바른 캡처 예시**")
+        # 📸 깃허브에 '예시.png' 이름으로 파일이 잘 올라가 있어야 이미지가 뜹니다!
+        try:
+            st.image("예시.png", caption="이렇게 캡처해 주세요!", use_container_width=True) 
+        except:
+            st.error("이미지 파일을 찾을 수 없습니다. 깃허브에 '예시.png' 파일이 있는지 확인해 주세요.")
+            
+        st.markdown("- **스타프리즘**의 상세 옵션이 선명하게 보여야 합니다.\n- 옵션 텍스트(#연타, #생존 등)가 잘리지 않게 찍어주세요.\n- 여러 장의 보석을 한 번에 찍은 긴 스크린샷도 지원합니다.")
+        
     with col_g2:
-        st.warning("⚠️ **주의 사항**\n- UI가 너무 작으면 인식이 어려울 수 있음\n- 여러 장을 한 번에 올리면 1번 보석부터 순서대로 채워짐")
-       
-        col_g1, col_g2 = st.columns(2)
-    with col_g1:
-        st.info("✅ **올바른 캡처 예시**")
-        st.markdown("- **스타프리즘**의 상세 옵션이 선명하게 보여야 합니다.\n- 옵션 텍스트(#연타, #생존 등)가 잘리지 않게 찍어주세요.\n- 여러 장의 보석을 한 번에 찍은 긴 스크린샷도 지원합니다.")
+        st.warning("⚠️ **주의 사항**\n- UI가 너무 작으면 인식이 어려울 수 있음\n- 여러 장을 한 번에 올리면 1번 보석부터 순서대로 채워짐\n- 배경이 너무 밝거나 글자가 겹치면 인식이 안 될 수 있습니다.")
 
-col_g1, col_g2 = st.columns(2)
-    with col_g1:
-        st.info("✅ **올바른 캡처 예시**")
-        
-        st.image("예시.png", caption="이렇게 캡처해 주세요!", use_container_width=True) 
-        
-        st.markdown("- **스타프리즘**의 상세 옵션이 선명하게 보여야 합니다.\n- 옵션 텍스트(#연타, #생존 등)가 잘리지 않게 찍어주세요.\n- 여러 장의 보석을 한 번에 찍은 긴 스크린샷도 지원합니다.")
-    
     st.header("3. 평가 등급 (추천 행동)")
     st.markdown("""
     - **🌟 종결 (22점↑)**: 베스트 옵션 2개에 유효 옵션이 하나 더 붙은 최상급 상태
