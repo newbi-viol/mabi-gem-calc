@@ -257,7 +257,7 @@ with tab_guide:
         st.info("✅ **올바른 캡처 예시**")
         # 📸 깃허브에 '예시.png' 이름으로 파일이 잘 올라가 있어야 이미지가 뜹니다!
         try:
-            st.image("예시.png", caption="이렇게 캡처해 주세요!", use_container_width=True) 
+            st.image("예시).png", caption="이렇게 캡처해 주세요!", use_container_width=True) 
         except:
             st.error("이미지 파일을 찾을 수 없습니다. 깃허브에 '예시.png' 파일이 있는지 확인해 주세요.")
             
