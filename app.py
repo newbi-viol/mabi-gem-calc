@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import json
+import re  # [업데이트] 초정밀 문장 분석을 위한 모듈 추가
 
 # ---------------------------------------------------------
 # 🛑 OCR 및 이미지 처리 라이브러리 로드
@@ -57,17 +58,8 @@ def clear_all_gems():
     for i in range(22):
         for j in range(3): st.session_state[f"gem_{i}_{j}"] = "없음"
 
-def parse_ocr_text_to_option(ocr_text):
-    text = ocr_text.replace(" ", "") 
-    skills = ["강타", "방해", "원소", "보조", "연타", "생존", "소환", "이동"]
-    target_skill = next((s for s in skills if s in text), None)
-    if not target_skill: return "없음"
-    if any(k in text for k in ["대미지", "강화"]): return target_skill + "댐"
-    if any(k in text for k in ["대기시간", "쿨", "감소"]): return target_skill + "쿨"
-    return "없음"
-
 # ---------------------------------------------------------
-# 3. 사이드바 
+# 3. 사이드바 (업데이트: 초정밀 정규식 판독 로직 적용)
 # ---------------------------------------------------------
 with st.sidebar:
     st.header("👤 기본 설정")
@@ -83,15 +75,43 @@ with st.sidebar:
             with st.spinner("AI가 옵션을 정밀 분석 중입니다..."):
                 reader = easyocr.Reader(['ko', 'en'])
                 extracted = []
+                
                 for img_file in uploaded_images:
-                    result = reader.readtext(np.array(Image.open(img_file)))
-                    for (_, text, _) in result:
-                        parsed = parse_ocr_text_to_option(text)
-                        if parsed != "없음": extracted.append(parsed)
+                    # detail=0 옵션으로 단순히 글자 리스트만 빠르게 뽑아옴
+                    result = reader.readtext(np.array(Image.open(img_file)), detail=0)
+                    
+                    # [핵심] 줄바꿈으로 끊어진 텍스트를 하나의 아주 긴 문자열로 풀로 붙여버림 (공백 제거)
+                    full_text = "".join(result).replace(" ", "")
+                    
+                    # 스킬 이름이 등장하는 모든 위치(Index)를 찾음
+                    found_skills = []
+                    for match in re.finditer(r'(강타|방해|원소|보조|연타|생존|소환|이동)', full_text):
+                        found_skills.append((match.group(), match.start()))
+                        
+                    # 찾은 스킬 위치를 기준으로 문자열을 잘라서 "대미지"나 "쿨" 키워드가 있는지 확인
+                    for i in range(len(found_skills)):
+                        skill_name = found_skills[i][0]
+                        start_idx = found_skills[i][1]
+                        # 다음 스킬이 나오기 전까지, 혹은 문자열 끝까지 자름
+                        end_idx = found_skills[i+1][1] if i + 1 < len(found_skills) else len(full_text)
+                        
+                        chunk = full_text[start_idx:end_idx]
+                        
+                        # 잘라낸 조각(chunk) 안에 해당 키워드가 있으면 확정
+                        if any(k in chunk for k in ["대미지", "댐", "강화"]): 
+                            extracted.append(skill_name + "댐")
+                        elif any(k in chunk for k in ["대기", "시간", "쿨", "감소"]): 
+                            extracted.append(skill_name + "쿨")
+                            
+                # 추출된 옵션들을 순서대로 보석 슬롯에 입력
                 for i in range(22):
                     for j in range(3):
-                        if (i*3 + j) < len(extracted): st.session_state[f"gem_{i}_{j}"] = extracted[i*3 + j]
+                        idx = i*3 + j
+                        if idx < len(extracted): 
+                            st.session_state[f"gem_{i}_{j}"] = extracted[idx]
             st.rerun()
+        else:
+            st.error("터미널에 pip install easyocr 명령어를 입력하여 모듈을 설치해주세요.")
 
     st.divider()
     
@@ -255,9 +275,8 @@ with tab_guide:
     col_g1, col_g2 = st.columns(2)
     with col_g1:
         st.info("✅ **올바른 캡처 예시**")
-        # 📸 깃허브에 '예시.png' 이름으로 파일이 잘 올라가 있어야 이미지가 뜹니다!
         try:
-            st.image("예시).png", caption="이렇게 캡처해 주세요!", use_container_width=True) 
+            st.image("예시.png", caption="이렇게 캡처해 주세요!", use_container_width=True) 
         except:
             st.error("이미지 파일을 찾을 수 없습니다. 깃허브에 '예시.png' 파일이 있는지 확인해 주세요.")
             
