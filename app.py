@@ -59,7 +59,7 @@ def clear_all_gems():
         for j in range(3): st.session_state[f"gem_{i}_{j}"] = "없음"
 
 # ---------------------------------------------------------
-# 3. 사이드바 (디버그 모드 추가)
+# 3. 사이드바 (업데이트: 오타 교정 사전 탑재)
 # ---------------------------------------------------------
 with st.sidebar:
     st.header("👤 기본 설정")
@@ -76,27 +76,42 @@ with st.sidebar:
             with st.spinner("AI가 옵션을 정밀 분석 중입니다..."):
                 reader = easyocr.Reader(['ko', 'en'])
                 extracted = []
-                raw_text_list = [] # 디버그용 텍스트 저장소
+                raw_text_list = [] 
+                
+                # [핵심] 빈번한 AI 오타를 정상 스킬명으로 바꿔주는 마법의 사전
+                skill_map = {
+                    "강타": "강타", "강다": "강타", "깅타": "강타",
+                    "방해": "방해", "빙해": "방해",
+                    "원소": "원소", "왼소": "원소", "윈소": "원소",
+                    "보조": "보조", "보주": "보조", "뽀조": "보조",
+                    "연타": "연타", "언타": "연타", "면타": "연타",
+                    "생존": "생존", "상존": "생존", "셍존": "생존",
+                    "소환": "소환", "소힌": "소환", "수환": "소환",
+                    "이동": "이동", "어동": "이동", "아동": "이동"
+                }
+                skill_pattern = "|".join(skill_map.keys())
                 
                 for img_file in uploaded_images:
                     result = reader.readtext(np.array(Image.open(img_file)), detail=0)
                     full_text = "".join(result).replace(" ", "")
-                    raw_text_list.append(full_text) # 원본 텍스트 기록
+                    raw_text_list.append(full_text) 
                     
                     found_skills = []
-                    for match in re.finditer(r'(강타|방해|원소|보조|연타|생존|소환|이동)', full_text):
-                        found_skills.append((match.group(), match.start()))
+                    # 사전에 등록된 모든 오타 패턴을 검색
+                    for match in re.finditer(f'({skill_pattern})', full_text):
+                        # 오타를 발견하면 정상 스킬명으로 교정해서 저장
+                        found_skills.append((skill_map[match.group()], match.start()))
                         
                     for i in range(len(found_skills)):
-                        skill_name = found_skills[i][0]
+                        skill_name = found_skills[i][0] # (예: "왼소" -> "원소"로 교정됨)
                         start_idx = found_skills[i][1]
                         end_idx = found_skills[i+1][1] if i + 1 < len(found_skills) else len(full_text)
                         chunk = full_text[start_idx:end_idx]
                         
-                        # 오타 대비 키워드 소폭 확장
-                        if any(k in chunk for k in ["대미지", "데미지", "댐", "뎀", "강화"]): 
+                        # 데미지/쿨타임 키워드도 오타(대미지블, 재시용 등)에 대응하도록 확장
+                        if any(k in chunk for k in ["대미", "데미", "댐", "뎀", "강화", "깅화"]): 
                             extracted.append(skill_name + "댐")
-                        elif any(k in chunk for k in ["대기", "시간", "쿨", "감소", "재사용"]): 
+                        elif any(k in chunk for k in ["대기", "시간", "시긴", "쿨", "감소", "김소", "재사용", "재시용"]): 
                             extracted.append(skill_name + "쿨")
                             
                 for i in range(22):
@@ -105,16 +120,14 @@ with st.sidebar:
                         if idx < len(extracted): 
                             st.session_state[f"gem_{i}_{j}"] = extracted[idx]
                             
-                # 세션 스테이트에 디버그 텍스트 저장
                 st.session_state["debug_ocr"] = raw_text_list
             st.rerun()
         else:
             st.error("터미널에 pip install easyocr 명령어를 입력하여 모듈을 설치해주세요.")
 
-    # [핵심] AI가 읽은 원본 텍스트를 화면에 보여주는 디버그 창
     if "debug_ocr" in st.session_state and st.session_state["debug_ocr"]:
-        with st.expander("🛠️ (디버그) AI가 읽은 글자 확인", expanded=True):
-            st.warning("혹시 누락된 옵션이 있나요? 아래 텍스트를 복사해서 알려주세요!")
+        with st.expander("🛠️ (디버그) AI가 읽은 글자 확인", expanded=False):
+            st.warning("분석이 누락된 경우 아래 텍스트를 확인해주세요.")
             for idx, text in enumerate(st.session_state["debug_ocr"]):
                 st.code(text)
 
