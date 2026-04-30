@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import json
-import re  # [업데이트] 초정밀 문장 분석을 위한 모듈 추가
+import re
 
 # ---------------------------------------------------------
 # 🛑 OCR 및 이미지 처리 라이브러리 로드
@@ -59,7 +59,7 @@ def clear_all_gems():
         for j in range(3): st.session_state[f"gem_{i}_{j}"] = "없음"
 
 # ---------------------------------------------------------
-# 3. 사이드바 (업데이트: 초정밀 정규식 판독 로직 적용)
+# 3. 사이드바 (디버그 모드 추가)
 # ---------------------------------------------------------
 with st.sidebar:
     st.header("👤 기본 설정")
@@ -70,48 +70,53 @@ with st.sidebar:
     
     st.header("📸 보석세공 사진 업로드")
     uploaded_images = st.file_uploader("인게임 스크린샷 (다중 가능)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+    
     if uploaded_images and st.button("🔍 분석 및 자동 채우기", use_container_width=True):
         if OCR_AVAILABLE:
             with st.spinner("AI가 옵션을 정밀 분석 중입니다..."):
                 reader = easyocr.Reader(['ko', 'en'])
                 extracted = []
+                raw_text_list = [] # 디버그용 텍스트 저장소
                 
                 for img_file in uploaded_images:
-                    # detail=0 옵션으로 단순히 글자 리스트만 빠르게 뽑아옴
                     result = reader.readtext(np.array(Image.open(img_file)), detail=0)
-                    
-                    # [핵심] 줄바꿈으로 끊어진 텍스트를 하나의 아주 긴 문자열로 풀로 붙여버림 (공백 제거)
                     full_text = "".join(result).replace(" ", "")
+                    raw_text_list.append(full_text) # 원본 텍스트 기록
                     
-                    # 스킬 이름이 등장하는 모든 위치(Index)를 찾음
                     found_skills = []
                     for match in re.finditer(r'(강타|방해|원소|보조|연타|생존|소환|이동)', full_text):
                         found_skills.append((match.group(), match.start()))
                         
-                    # 찾은 스킬 위치를 기준으로 문자열을 잘라서 "대미지"나 "쿨" 키워드가 있는지 확인
                     for i in range(len(found_skills)):
                         skill_name = found_skills[i][0]
                         start_idx = found_skills[i][1]
-                        # 다음 스킬이 나오기 전까지, 혹은 문자열 끝까지 자름
                         end_idx = found_skills[i+1][1] if i + 1 < len(found_skills) else len(full_text)
-                        
                         chunk = full_text[start_idx:end_idx]
                         
-                        # 잘라낸 조각(chunk) 안에 해당 키워드가 있으면 확정
-                        if any(k in chunk for k in ["대미지", "댐", "강화"]): 
+                        # 오타 대비 키워드 소폭 확장
+                        if any(k in chunk for k in ["대미지", "데미지", "댐", "뎀", "강화"]): 
                             extracted.append(skill_name + "댐")
-                        elif any(k in chunk for k in ["대기", "시간", "쿨", "감소"]): 
+                        elif any(k in chunk for k in ["대기", "시간", "쿨", "감소", "재사용"]): 
                             extracted.append(skill_name + "쿨")
                             
-                # 추출된 옵션들을 순서대로 보석 슬롯에 입력
                 for i in range(22):
                     for j in range(3):
                         idx = i*3 + j
                         if idx < len(extracted): 
                             st.session_state[f"gem_{i}_{j}"] = extracted[idx]
+                            
+                # 세션 스테이트에 디버그 텍스트 저장
+                st.session_state["debug_ocr"] = raw_text_list
             st.rerun()
         else:
             st.error("터미널에 pip install easyocr 명령어를 입력하여 모듈을 설치해주세요.")
+
+    # [핵심] AI가 읽은 원본 텍스트를 화면에 보여주는 디버그 창
+    if "debug_ocr" in st.session_state and st.session_state["debug_ocr"]:
+        with st.expander("🛠️ (디버그) AI가 읽은 글자 확인", expanded=True):
+            st.warning("혹시 누락된 옵션이 있나요? 아래 텍스트를 복사해서 알려주세요!")
+            for idx, text in enumerate(st.session_state["debug_ocr"]):
+                st.code(text)
 
     st.divider()
     
